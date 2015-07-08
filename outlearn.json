@@ -27,7 +27,7 @@
     {"olm" : "./modules/partitioning.md"},
     {"olm" : "./modules/schema-updates.md"},
     {"olm" : "./modules/stored-procedures.md"},
-    {"olm" : "./modules/client-applications.md"},
+    {"olm" : "./modules/client-applications.md"}
   ],
 
   "assets" : [
