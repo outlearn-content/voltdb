@@ -1,0 +1,24 @@
+{
+  "olpVersion" : "0.5",
+
+  "paths" : [
+    {
+      "name" : "tutorial",
+      "title" : "VoltDB Tutorial",
+      "description" : "For new users, including source code and sample data for learning what makes VoltDB unique.",
+      "coverImage" : "https://raw.githubusercontent.com/outlearn-content/voltdb/master/assets/triangles.jpg",
+      "privacy" : "public",
+      "pages" : [
+        {"page" : "./pages/preface.md"},
+        {"module" : "creating"}
+      ]
+    }
+  ],
+
+  "modules" : [
+    {"olm" : "./modules/creating.md"}
+  ],
+
+  "assets" : [
+  ]
+}
