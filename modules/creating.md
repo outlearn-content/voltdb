@@ -26,6 +26,19 @@ CREATE TABLE towns (
 
 The preceding schema defines a single table with three columns: town, county, and state. We could also set options, such as default values and primary keys. But for now we will keep it as simple as possible.
 
+<!-- @task, "hasDeliverable" : true, "text" : "Write a simple database schema with for VoltDB and submit it here."-->
+
+<!-- @multipleChoice -->
+
+VoltDB defines a database schema using what?
+
+- [ ] XML syntax
+- [X] DDL syntax
+- [ ] free-form syntax
+
+
+<!-- @end -->
+
 <!-- @section -->
 
 ## Starting the Database and Loading the Schema
@@ -61,6 +74,8 @@ To load the schema, you can either type the DDL schema statements by hand or, if
 4>   state VARCHAR(2)
 5> );
 ```
+
+<!-- @task, "text" : "Create a table using your schema."-->
 
 <!-- @section -->
 
@@ -98,5 +113,7 @@ Buffalo      NY
 ```
 
 When you are done working with the database, you can type "exit" to end the sqlcmd session and return to the shell command prompt. Then switch back to the terminal session where you started the database and press CTRL-C to end the database process.
+
+<!-- @task, "text" : "Create some records and run a few queries against them."-->
 
 This ends Part One of the tutorial.
