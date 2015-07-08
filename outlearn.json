@@ -5,7 +5,7 @@
     {
       "name" : "tutorial",
       "title" : "VoltDB Tutorial",
-      "description" : "Tutorial for new users which includes source code and sample data for learning what makes VoltDB unique.",
+      "description" : "This tutorial for new users includes source code and sample data for learning what makes VoltDB unique.",
       "coverImage" : "https://raw.githubusercontent.com/outlearn-content/voltdb/master/assets/triangles.jpg",
       "privacy" : "public",
       "pages" : [
