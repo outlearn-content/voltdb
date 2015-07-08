@@ -1,9 +1,9 @@
 <!--
 {
-"name" : "creating",
+"name" : "stored-procedures",
 "version" : "0.1",
-"title" : "Creating the Database",
-"description": "In VoltDB you define your database schema using SQL data definition language (DDL) statements just like other SQL databases.",
+"title" : "Stored Procedures",
+"description": "Tutorial for VoltDB.",
 "freshnessDate" : 2015-07-08,
 "homepage" : "http://docs.voltdb.com/tutorial/",
 "license" : "All Rights Reserved"
@@ -12,279 +12,282 @@
 
 <!-- @section -->
 
-### Getting started
+## Overview
 
-### Overview
+We now have a complete database that we can interact with using SQL queries. For example, we can find the least populous county for any given state (California, for example) with the following SQL query:
 
-After working with [Backbone](http://backbonejs.org/), [Meteor](http://meteor.com/), [AngularJS](http://angularjs.org/) and [Ember](http://emberjs.com/) (however, I have not dived deep into Ember yet), I feel that AngularJS is prepared the best for [Test Driven Development](http://en.wikipedia.org/wiki/Test-driven_development) (TDD). It truly makes it a cinch removing all excuses to not use tests in your application!
-
-I have had the pleasure of focusing on testing within an [AngularJS](http://angularjs.org/) client application recently and lost a small amount of time testing a [directive](http://docs.angularjs.org/guide/directive). The issue revolved around the template being located as an external html file as opposed to being included within the directive itself. There were a couple of head scratching errors that [@amscotti](https://twitter.com/amscotti) and I had whilst seeking a solution but here’s a suggested approach.
-
-
-
-### Tools
-
-We will start from scratch, but it won’t take long to get up and running if we use [Yeoman](http://yeoman.io/). In fact there are a few libs I can recommend using:
-
-*   [Grunt](http://gruntjs.com/)
-*   [Bower](http://bower.io/)
-*   [Karma](http://karma-runner.github.io/)
-
-`sudo npm install -g yo grunt-cli bower karma`
-
-Two yeoman generators you may find useful are:
-
-*   [generator-angular](https://github.com/yeoman/generator-angular)
-*   [generator-karma](https://github.com/yeoman/generator-karma)
-
-`sudo npm install -g generator-angular generator-karma`
-
-(thanks to [@amscotti](https://twitter.com/amscotti) for the heads up on these).
-
-An alternative to the manual installation routine above is to use the awesome [Boxen](http://boxen.github.com/), read more on this [here](http://newtriks.com/2013/04/16/setting-up-node-dot-js-on-boxen/).
-
-<!-- @task, "text" : "Install the tools."-->
-
-### Create the project
-
-```sh
-mkdir directive-example && cd $_
-yo angular
+```
+$ sqlcmd
+1> SELECT TOP 1 county, abbreviation, population
+2>     FROM people, states WHERE people.state_num=6
+3>     AND people.state_num=states.state_num
+4>     ORDER BY population ASC;
 ```
 
-<!-- @task, "text" : "Create the project."-->
-
-Here is a further list of [AngularJS generators](https://github.com/yeoman/generator-angular#generators)
-
-
+However, typing in the same query with a different state number over and over again gets tiring very quickly. The situation gets worse as the queries get more complex.
 
 <!-- @section -->
 
-### Configure Karma
+## Simple Stored Procedures
 
-Open the [karma.conf.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/karma.conf.js) file and make the following changes (any changes to this file require you to restart Karma):
+For queries you run frequently, only changing the input, you can create a simple stored procedure. Stored procedures let you define the query once and change the input values when you execute the procedure. Stored procedures have an additional benefit; because they are pre-compiled, the queries do not need to be planned at runtime, reducing the time it takes for each query to execute.
 
-**Base path**
+To create simple stored procedures — that is, procedures consisting of a single SQL query — you can define the entire procedure in your database schema using the CREATE PROCEDURE AS statement. So, for example to turn our previous query into a stored procedure, we can add the following statement to our schema:
 
-To enable Karma to use the correct template path _and_ have the directive load template file you will need to change the _basePath_:
-
-`basePath = 'app';`
-
-**File patterns**
-
-Amend the paths to reflect the newly defined _basePath_:
-
-```javascript
-files = [
-  JASMINE,
-  JASMINE_ADAPTER,
-  'components/angular/angular.js',
-  'components/angular-mocks/angular-mocks.js',
-  'scripts/*.js',
-  'scripts/**/*.js',
-  'views/**/*.html',
-  '../test/mock/**/*.js',
-  '../test/spec/**/*.js'
-];
+```
+CREATE PROCEDURE leastpopulated AS
+  SELECT TOP 1 county, abbreviation, population
+    FROM people, states WHERE people.state_num=?
+    AND people.state_num=states.state_num
+    ORDER BY population ASC;
 ```
 
-**Compiling templates**
+In the CREATE PROCEDURE AS statement:
 
-Templates need to be compiled to javascript otherwise you will get a parse error on running Karma. The [html2js preprocessor](https://github.com/karma-runner/karma-ng-html2js-preprocessor) is the solution and simply requires adding the following to your [karma.conf.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/karma.conf.js) (this is based on you storing template files within a directory in _views_):
+1. The label, in this case leastpopulated, is the name given to the stored procedure.
+2. Question marks are used as placeholders for values that will be input at runtime.
 
-```javascript
-preprocessors = {
-  'views/**/*.html': 'html2js'
-};
+In addition to creating the stored procedure, we can also specify if it is single-partitioned or not. When you partition a stored procedure, you associate it with a specific partition based on the table that it accesses. For example, the preceding query accesses the People table and, more importantly, narrows the focus to a specific value of the partitioning column, State_num.
+
+Note that you can access more than one table in a single-partition procedure, as we do in the preceding example. However, all of the data you access must be in that partition. In other words, all the tables you access must be partitioned on the same key value or, for read-only SELECT statements, you can also include replicated tables.
+
+So we can partition our new procedure on the People table by adding a separate PARTITION PROCEDURE statement. Or we can add the partitioning information as a clause of the CREATE PROCEDURE statement. Combining the procedure declaration and partitioning information can be more efficient and has additional benefits for complex procedures. So a combined statement is recommended:
+
+```
+CREATE PROCEDURE leastpopulated
+   PARTITION ON TABLE people COLUMN state_num
+AS
+   SELECT TOP 1 county, abbreviation, population
+     FROM people, states WHERE people.state_num=?
+     AND people.state_num=states.state_num
+     ORDER BY population ASC;
 ```
 
-**Auto watch**
+Now when we invoke the stored procedure, it is executed only in the partition where the State_num column matches the first argument to the procedure, leaving the other partitions free to process other requests.
 
-This is a really cool part of Karma where you can enable watching files and then auto executing tests as you develop:
+Of course, before we can use the procedure we need to add it to the database. Modifying stored procedures can be done on the fly, like adding and removing tables. So we do not need to restart the database, just type the CREATE PARTITION statement at the sqlcmd prompt:
 
-`autoWatch = true;`
+```
+sqlcmd>
+1> CREATE PROCEDURE leastpopulated
+2>   PARTITION ON TABLE people COLUMN state_num
+3> AS
+4>    SELECT TOP 1 county, abbreviation, population
+5>      FROM people, states WHERE people.state_num=?
+6>      AND people.state_num=states.state_num
+7>      ORDER BY population ASC;
+```
 
-<!-- @task, "text" : "Go through all the configuration."-->
+Once we update the catalog, the new procedure becomes available. So we can now execute the query multiple times for different states simply by changing the argument to the procedure:
 
-**Optional**
+```
+1> exec leastpopulated 6;
+COUNTY         ABBREVIATION  POPULATION
+-------------- ------------- -----------
+Alpine County  CA                   1175
 
-I use [PhantomJS](http://phantomjs.org/) to run the Angular tests as opposed to relying on a browser such as Chrome.
 
-Change the browser for running tests to PhantomJS:
+(1 row(s) affected)
+2> exec leastpopulated 48;
+COUNTY         ABBREVIATION  POPULATION
+-------------- ------------- -----------
+Loving County  TX                     82
 
-`browsers = ['PhantomJS'];`
+
+(1 row(s) affected)
+```
 
 <!-- @section -->
 
-### Create your own example
+## Writing More Powerful Stored Procedures
 
-### Create a directive
+Simple stored procedures written purely in SQL are very handy as short cuts. However, some procedures are more complex, requiring multiple queries and additional computation based on query results. For more involved procedures, VoltDB supports writing stored procedures in Java.
 
-```javascript
-yo angular:directive albums
+It isn't necessary to be a Java programming wizard to write VoltDB stored procedures. All VoltDB stored procedures have the same basic structure. For example, the following code reproduces the simple stored procedure leastpopulated we wrote in the previous section using Java:
+
+```
+import org.voltdb.*;1
+
+public class LeastPopulated extends VoltProcedure {2
+
+  public final SQLStmt getLeast = new SQLStmt(
+      " SELECT TOP 1 county, abbreviation, population "
+    + " FROM people, states WHERE people.state_num=?"
+    + " AND people.state_num=states.state_num"
+    + " ORDER BY population ASC;" );3
+
+  public VoltTable[] run(integer state_num)4
+      throws VoltAbortException {
+
+          voltQueueSQL( getLeast, state_num );5
+          return voltExecuteSQL();6
+
+      }
+}
 ```
 
+In this example:
 
+1. We start by importing the necessary VoltDB classes and methods.
+2. The procedure itself is defined as a Java class. The Java class name is the name we use at runtime to invoke the procedure. In this case, the procedure name is LeastPopulated.
+3. At the beginning of the class, you declare the SQL queries that the stored procedure will use. Here we use the same SQL query from the simple stored procedure, including the use of a question mark as a placeholder.
+4. The body of the procedure is a single run method. The arguments to the run method are the arguments that must be provided when invoking the procedure at runtime.
+5. Within the run method, the procedure queues one or more queries, specifying the SQL query name, declared in step 3, and the arguments to be used for the placeholders. (Here we only have the one query with one argument, the state number.)
+6. Finally, a call executes all of the queued queries and the results of those queries are returned to the calling application.
 
-### Start Karma
+Now, writing a Java stored procedure to execute a single SQL query is overkill. But it does illustrate the basic structure of the procedure.
 
-To start Karma which will also auto run the tests when we update the files use:
+Java stored procedures become important when designing more complex interactions with the database. One of the most important aspects of VoltDB stored procedures is that each stored procedure is executed as a complete unit, a transaction, that either succeeds or fails as a whole. If any errors occur during the transaction, earlier queries in the transaction are rolled back before a response is returned to the calling application, or any further work is done by the partition.
 
-`karma start`
+One such transaction might be updating the database. It just so happens that the population data from the U.S. Census Bureau contains both actual census results and estimated population numbers for following years. If we want to update the database to replace the 2010 results with the 2011 estimated statistics (or some future estimates), we would need a procedure to:
 
-You should now see that two tests have been executed successfully:
+1. Check to see if a record already exists for the specified state and county.
+2. If so, use the SQL UPDATE statement to update the record.
+3. If not, use an INSERT statement to create a new record.
 
-`Executed 2 of 2 SUCCESS (0.284 secs / 0.015 secs)`
+We can do that by extending our original sample Java stored procedure. We can start be giving the Java class a descriptive name, UpdatePeople. Next we include the three SQL statements we will use (SELECT, UPDATE, and INSERT). We also need to add more arguments to the procedure to provide data for all of the columns in the People table. Finally, we add the query invocations and conditional logic needed. Note that we queue and execute the SELECT statement first, then evaluate its results (that is, whether there is at least one record or not) before queuing either the UPDATE or INSERT statement.
 
+The following is the completed stored procedure source code.
 
-
-### Create a failing test
-
-
-```javascript
-'use strict';
-
-describe('Directive: albums', function() {
-  beforeEach(module('directiveExampleApp'));
-
-    var element, scope;
-
-    beforeEach(module('views/templates/albums.html'));
-
-    beforeEach(inject(function($rootScope, $compile) {
-        element = angular.element('<div class="well span6">' +
-            '<h3>Busdriver Albums:</h3>' +
-            '<albums ng-repeat="album in albums" title="{{album.title}}">' +
-            '</albums></div>');
-
-        scope = $rootScope;
-
-        scope.albums = [{
-            'title': 'Memoirs of the Elephant Man'
-        }, {
-            'title': 'Temporary Forever'
-        }, {
-            'title': 'Cosmic Cleavage'
-        }, {
-            'title': 'Fear of a Black Tangent'
-        }, {
-            'title': 'RoadKillOvercoat'
-        }, {
-            'title': 'Jhelli Beam'
-        }, {
-            'title': 'Beaus$Eros'
-        }];
-
-        $compile(element)(scope);
-        scope.$digest();
-    }));
-
-    it("should have the correct amount of albums in the list", function() {
-        var list = element.find('li');
-        expect(list.length).toBe(7);
-    });
-});
 ```
+import org.voltdb.*;
 
+public class UpdatePeople extends VoltProcedure {
 
+  public final SQLStmt findCurrent = new SQLStmt(
+      " SELECT * FROM people WHERE state_num=? AND county_num=?;");
+  public final SQLStmt updateExisting = new SQLStmt(
+      " UPDATE people SET population=?"
+    + " WHERE state_num=? AND county_num=?;");
+  public final SQLStmt addNew = new SQLStmt(
+      " INSERT INTO people VALUES (?,?,?,?);");
 
-(Our list is sourced from the crazy talented [Busdriver](http://en.wikipedia.org/wiki/Busdriver#Discography)!)
+  public VoltTable[] run(byte state_num,
+                         short county_num,
+                         String county,
+                         long population)
+      throws VoltAbortException {
 
-Let’s fix the first error we see:
+          voltQueueSQL( findCurrent, state_num, county_num );
+          VoltTable[] results = voltExecuteSQL();
 
-`Error: No module: views/templates/albums.html`
+          if (results[0].getRowCount() > 0) { // found a record
+             voltQueueSQL( updateExisting, population,
+                                           state_num,
+                                           county_num );
+
+          } else {  // no existing record
+             voltQueueSQL( addNew, state_num,
+                                   county_num,
+                                   county,
+                                   population);
+
+          }
+          return voltExecuteSQL();
+      }
+}
+```
 
 <!-- @section -->
 
-### Build a simple template
+## Compiling Java Stored Procedures
 
-```sh
-mkdir -p app/views/templates
-touch app/views/templates/albums.html
+Once we write the Java stored procedure, we need to load it into the database and then declare it in DDL the same way we do with simple stored procedures. But first, the Java class itself needs compiling. We use the Java compiler, javac, to compile the procedure the same way we would any other Java program.
+
+When compiling stored procedures, the Java compiler must be able to find the VoltDB classes and methods imported at the beginning of the procedure. To do that, we must include the VoltDB libraries in the Java classpath. The libraries are in the subfolder /voltdb where you installed VoltDB. For example, if you installed VoltDB in the directory /opt/voltdb, the command to compile the UpdatePeople procedure is the following:
 
 ```
-
-Our test is still failing, let’s add the new template to the [albums.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/app/scripts/directives/albums.js#L6) directive, change the line of code declaring the template to:
-
-`templateUrl: 'views/templates/albums.html',`
-
-The test will still fail as we are not creating a list within the template. Let’s do that now by adding the following to the [albums.html](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/app/views/templates/albums.html):
-
-`<ul><li></li></ul>`
-
-And update the [albums.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/app/scripts/directives/albums.js) directive as follows:
-
-
-```javascript
-'use strict';
-
-angular.module('directiveExampleApp')
-  .directive('albums', function() {
-    return {
-        templateUrl: 'views/templates/albums.html',
-        restrict: 'E',
-        scope: {}
-    };
-});
+$ javac -cp "$CLASSPATH:/opt/voltdb/voltdb/*"  UpdatePeople.java
 ```
 
+Once we compile the source code into a Java class, we need to package it (and any other Java stored procedures and classes the database uses) into a Jar file and load it into the database. Jar files are a standard format for compressing and packaging Java files. You use the jar command to create a Jar file, specifying the name of the Jar file to create and the files to include. For example, you can package the UpdatePeople.class file you created in the previous step into a Jar file named storedprocs.jar with the following command:
 
-Word! The test passes. Let’s add another test to check the first album in the list has the correct title.
-
-```javascript
-it("should display the correct album title for the first item in the albums list", function() {
-    var list = element.find('li');
-    expect(list.eq(0).text()).toBe('Memoirs of the Elephant Man');
-});
+```
+$ jar cvf storedprocs.jar *.class
 ```
 
-The test fails. Let’s add the title attribute to the directives scope in [albums.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/app/scripts/directives/albums.js):
+Once you package the stored procedures into a Jar file, you can then load them into the database using the sqlcmd load classes directive. For example:
 
-
-
-```javascript
-'use strict';
-
-angular.module('directiveExampleApp')
-  .directive('albums', function() {
-    return {
-        templateUrl: 'views/templates/albums.html',
-        restrict: 'E',
-        scope: {
-            title: '@title'
-        }
-    };
-});
+```
+$ sqlcmd
+1> load classes storedprocs.jar;
 ```
 
+Finally, we can declare the stored procedure in our schema, in much the same way simple stored procedures are declared. But this time we use the CREATE PROCEDURE FROM CLASS statement, specifying the class name rather than the SQL query. We can also partition the procedure on the People table, since all of the queries are constrained to a specific value of State_num, the partitioning column. Here is the statement we add to the schema.
 
-Sweet, the test’s are passing again.
+```
+CREATE PROCEDURE
+   PARTITION ON TABLE people COLUMN state_num
+   FROM CLASS UpdatePeople;
+```
 
-All the source to this project can be found on [Github](https://github.com/newtriks/angularjs-directives-testing-project).
+Notice that you do not need to specify the name of the procedure after "CREATE PROCEDURE" because, unlike simple stored procedures, the CREATE PROCEDURE FROM CLASS statement takes the procedure name from the name of the class; in this case, UpdatePeople.
 
+Go ahead and enter the CREATE PROCEDURE FROM CLASS statement at the sqlcmd prompt to bring your database up to date:
+
+```
+$ sqlcmd
+1> CREATE PROCEDURE
+2>   PARTITION ON TABLE people COLUMN state_num
+3>   FROM CLASS UpdatePeople;
+```
 
 <!-- @section -->
 
-### Potential errors and solutions
+## Putting it All Together
 
-**[Spawn error solution](https://github.com/karma-runner/karma/issues/452)**
+OK. Now we have a Java stored procedure and an updated schema. We are ready to try them out.
 
-Set an env variable to your _~/.profile_ or _~/.bash_profile_.
+Obviously, we don't want to invoke our new procedure manually for each record in the People table. We could write a program to do it for us. Fortunately, there is a program already available that we can use.
 
-```sh
-which phantomjs
-export PHANTOMJS_BIN='YOUR_PATH_TO_PHANTOMJS'
-~/.profile to reload
+The csvloader command normally uses the default INSERT procedures to load data into a table. However, you can specify an different procedure if you wish. So we can use csvloader to invoke our new procedure to update the database with every record in the data file.
+
+First we must filter the data to the columns we need. We use the same shell commands we used to create the initial input file, except we switch to selecting the column with data for the 2011 estimate rather than the actual census results. We can save this file as data/people2011.txt (which is included with the source files):
+
+```
+$ grep -v "^040," data/CO-EST2011-Alldata.csv \
+| cut --delimiter="," --fields=4,5,7,11 > data/people2011.txt
 ```
 
-**[Missing mocks error solution](https://github.com/yeoman/generator-angular#testing)**
+Before we update the database, let's just check to see which are the two counties with the smallest population:
 
-`bower install angular-mocks`
+```
+$ sqlcmd
+SQL Command :: localhost:21212
+1> SELECT TOP 2 county, abbreviation, population
+2> FROM people,states WHERE people.state_num=states.state_num
+3> ORDER BY population ASC;
+COUNTY          ABBREVIATION  POPULATION
+--------------- ------------- -----------
+Loving County   TX                     82
+Kalawao County  HI                     90
 
-<!-- @section -->
 
-### Useful links
+(2 row(s) affected)
+```
 
-*   Vojta’s (godfather of Angular TDD) [ng-directive-testing](https://github.com/vojtajina/ng-directive-testing) example.
-*   Vojta’s [presentation](http://www.youtube.com/watch?v=rB5b67Cg6bc) on testing directives.
-*   AngularJS Developers [guide](http://docs.angularjs.org/guide/index)
+Now we can run csvloader to update the database, using the -p flag indicating that we are specifying a stored procedure name rather than a table name:
+
+```
+$ csvloader --skip 1 --file data/people2011.txt \
+       -p UpdatePeople
+```
+
+And finally, we can check to see the results of the update by repeating our earlier query:
+
+```
+$ sqlcmd
+SQL Command :: localhost:21212
+1> SELECT TOP 2 county, abbreviation, population
+2> FROM people,states WHERE people.state_num=states.state_num
+3> ORDER BY population ASC;
+COUNTY          ABBREVIATION  POPULATION
+--------------- ------------- -----------
+Kalawao County  HI                     90
+Loving County   TX                     94
+
+
+(2 row(s) affected)
+```
+
+Aha! In fact, the estimates show that Loving County, Texas is growing and is no longer the smallest!

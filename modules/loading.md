@@ -3,7 +3,7 @@
 "name" : "loading",
 "version" : "0.1",
 "title" : "Loading and Managing Data",
-"description": "In VoltDB you define your database schema using SQL data definition language (DDL) statements just like other SQL databases.",
+"description": "Learn more about powerful tools to handle data in VoltDB.",
 "freshnessDate" : 2015-07-08,
 "homepage" : "http://docs.voltdb.com/tutorial/",
 "license" : "All Rights Reserved"

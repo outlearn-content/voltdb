@@ -1,9 +1,9 @@
 <!--
 {
-"name" : "creating",
+"name" : "partitioning",
 "version" : "0.1",
-"title" : "Creating the Database",
-"description": "In VoltDB you define your database schema using SQL data definition language (DDL) statements just like other SQL databases.",
+"title" : "Partitioning",
+"description": "Tutorial for VoltDB.",
 "freshnessDate" : 2015-07-08,
 "homepage" : "http://docs.voltdb.com/tutorial/",
 "license" : "All Rights Reserved"
@@ -12,279 +12,85 @@
 
 <!-- @section -->
 
-### Getting started
+## Overview
 
-### Overview
+Now you have the hang of the basic features of VoltDB as a relational database, it's time to start looking at what makes VoltDB unique. One of the most important features of VoltDB is partitioning.
 
-After working with [Backbone](http://backbonejs.org/), [Meteor](http://meteor.com/), [AngularJS](http://angularjs.org/) and [Ember](http://emberjs.com/) (however, I have not dived deep into Ember yet), I feel that AngularJS is prepared the best for [Test Driven Development](http://en.wikipedia.org/wiki/Test-driven_development) (TDD). It truly makes it a cinch removing all excuses to not use tests in your application!
+*Partitioning* organizes the contents of a database table into separate autonomous units. Similar to sharding, VoltDB partitioning is unique because:
 
-I have had the pleasure of focusing on testing within an [AngularJS](http://angularjs.org/) client application recently and lost a small amount of time testing a [directive](http://docs.angularjs.org/guide/directive). The issue revolved around the template being located as an external html file as opposed to being included within the directive itself. There were a couple of head scratching errors that [@amscotti](https://twitter.com/amscotti) and I had whilst seeking a solution but here’s a suggested approach.
-
-
-
-### Tools
-
-We will start from scratch, but it won’t take long to get up and running if we use [Yeoman](http://yeoman.io/). In fact there are a few libs I can recommend using:
-
-*   [Grunt](http://gruntjs.com/)
-*   [Bower](http://bower.io/)
-*   [Karma](http://karma-runner.github.io/)
-
-`sudo npm install -g yo grunt-cli bower karma`
-
-Two yeoman generators you may find useful are:
-
-*   [generator-angular](https://github.com/yeoman/generator-angular)
-*   [generator-karma](https://github.com/yeoman/generator-karma)
-
-`sudo npm install -g generator-angular generator-karma`
-
-(thanks to [@amscotti](https://twitter.com/amscotti) for the heads up on these).
-
-An alternative to the manual installation routine above is to use the awesome [Boxen](http://boxen.github.com/), read more on this [here](http://newtriks.com/2013/04/16/setting-up-node-dot-js-on-boxen/).
-
-<!-- @task, "text" : "Install the tools."-->
-
-### Create the project
-
-```sh
-mkdir directive-example && cd $_
-yo angular
-```
-
-<!-- @task, "text" : "Create the project."-->
-
-Here is a further list of [AngularJS generators](https://github.com/yeoman/generator-angular#generators)
-
-
+* VoltDB partitions the database tables automatically, based on a partitioning column you specify. You do not have to manually manage the partitions.
+* You can have multiple partitions, or sites, on a single server. In other words, partitioning is not just for scaling the data volume, it helps performance as well.
+* VoltDB partitions both the data and the processing that accesses that data, which is how VoltDB leverages the throughput improvements parallelism provides.
 
 <!-- @section -->
 
-### Configure Karma
+## Partitioned Tables
 
-Open the [karma.conf.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/karma.conf.js) file and make the following changes (any changes to this file require you to restart Karma):
+You partition a table by specifying the partitioning column as part of your schema. If a table is partitioned, each time you insert a row into that table, VoltDB decides which partition the row goes into based on the value of the partitioning column. So, for example, if you partition the Towns table on the column Name, the records for all towns with the same name end up in the same partition.
 
-**Base path**
+However, although partitioning by name may be reasonable in terms of evenly distributing the records, the goal of partitioning is to distribute both the data and the processing. We don't often compare information about towns with the same name. Whereas, comparing towns within a given geographic region is very common. So let's partition the records by state so we can quickly do things like finding the largest or highest town within a given state.
 
-To enable Karma to use the correct template path _and_ have the directive load template file you will need to change the _basePath_:
+Both the Towns and the People tables have columns for the state name. However, they are slightly different; one uses the state abbreviation and one uses the full name. To be consistent, we can use the State_num column instead, which is common to both tables.
 
-`basePath = 'app';`
+To partition the tables, we simply add a PARTITION TABLE statement to the database schema. Here are the statements we can add to our schema to partition both tables by the State_num column:
 
-**File patterns**
-
-Amend the paths to reflect the newly defined _basePath_:
-
-```javascript
-files = [
-  JASMINE,
-  JASMINE_ADAPTER,
-  'components/angular/angular.js',
-  'components/angular-mocks/angular-mocks.js',
-  'scripts/*.js',
-  'scripts/**/*.js',
-  'views/**/*.html',
-  '../test/mock/**/*.js',
-  '../test/spec/**/*.js'
-];
+```
+PARTITION TABLE towns ON COLUMN state_num;
+PARTITION TABLE people ON COLUMN state_num;
 ```
 
-**Compiling templates**
+Having added partitioning information, we can stop the database, restart and reload the schema and data. This time, rather than using CTRL-C to kill the database process, we can use the voltadmin shutdown command. The voltadmin commands perform administrative functions for a database cluster and shutdown performs an orderly shutdown of the database whether a single node or a 15 node cluster. So go to the second terminal session and use voltadmin shutdown to stop the database:
 
-Templates need to be compiled to javascript otherwise you will get a parse error on running Karma. The [html2js preprocessor](https://github.com/karma-runner/karma-ng-html2js-preprocessor) is the solution and simply requires adding the following to your [karma.conf.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/karma.conf.js) (this is based on you storing template files within a directory in _views_):
-
-```javascript
-preprocessors = {
-  'views/**/*.html': 'html2js'
-};
+```
+$ voltadmin shutdown
 ```
 
-**Auto watch**
+Then you can restart the database and load the new schema and data files:
 
-This is a really cool part of Karma where you can enable watching files and then auto executing tests as you develop:
+```
+  [terminal 1]
+$ voltdb create
 
-`autoWatch = true;`
+  [terminal 2]
+$ sqlcmd
+1> FILE towns.sql;
+Command succeeded.
+2> exit
+$ cd data
+$ csvloader --separator "|"  --skip 1   \
+             --file towns.txt  towns
+$ csvloader --file people.txt --skip 1 people
+```
 
-<!-- @task, "text" : "Go through all the configuration."-->
-
-**Optional**
-
-I use [PhantomJS](http://phantomjs.org/) to run the Angular tests as opposed to relying on a browser such as Chrome.
-
-Change the browser for running tests to PhantomJS:
-
-`browsers = ['PhantomJS'];`
+The first thing you might notice, without doing any other queries, is that loading the data files is faster. In fact, when csvloader runs, it creates three log files summarizing the results of the loading process. One of these files, `csvloader_TABLE-NAME_insert_report.log`, describes how long the process took and the average transactions per second (TPS). Comparing the load times before and after adding partitioning shows that adding partitioning increases the ingestion rate for the Towns table from approximately 5,000 to 16,000 TPS — more than three times as fast! This performance improvement is a result of parallelizing the stored procedure calls across eight sites per host. Increasing the number of sites per host can provide additional improvements, assuming the server has the core processors necessary to manage the additional threads.
 
 <!-- @section -->
 
-### Create your own example
+## Replicated Tables
 
-### Create a directive
+As mentioned earlier, the two tables Towns and People both have a VARCHAR column for the state name, but its use is not consistent. Instead we use the State_num column to do partitioning and joining of the two tables.
 
-```javascript
-yo angular:directive albums
-```
+The State_num column contains the FIPS number. That is, a federal standardized identifier assigned to each state. The FIPS number ensures unique and consistent identification of the state. However, as useful as the FIPS number is for computation, most people think of their location by name, not number. So it would be useful to have a consistent name to go along with the number.
 
+Instead of attempting to modify the fields in the individual tables, we can normalize our schema and create a separate table that provides an authoritative state name for each state number. Again, the federal government makes this information freely available from the U.S. Environmental Protection Agency web site, http://www.epa.gov/enviro/html/codes/state.html. Although it is not directly downloadable as a data file, a copy of the FIPS numbers and names for all of the states is included in the tutorial files in the data subfolder as `data/state.txt`.
 
-
-### Start Karma
-
-To start Karma which will also auto run the tests when we update the files use:
-
-`karma start`
-
-You should now see that two tests have been executed successfully:
-
-`Executed 2 of 2 SUCCESS (0.284 secs / 0.015 secs)`
-
-
-
-### Create a failing test
-
-
-```javascript
-'use strict';
-
-describe('Directive: albums', function() {
-  beforeEach(module('directiveExampleApp'));
-
-    var element, scope;
-
-    beforeEach(module('views/templates/albums.html'));
-
-    beforeEach(inject(function($rootScope, $compile) {
-        element = angular.element('<div class="well span6">' +
-            '<h3>Busdriver Albums:</h3>' +
-            '<albums ng-repeat="album in albums" title="{{album.title}}">' +
-            '</albums></div>');
-
-        scope = $rootScope;
-
-        scope.albums = [{
-            'title': 'Memoirs of the Elephant Man'
-        }, {
-            'title': 'Temporary Forever'
-        }, {
-            'title': 'Cosmic Cleavage'
-        }, {
-            'title': 'Fear of a Black Tangent'
-        }, {
-            'title': 'RoadKillOvercoat'
-        }, {
-            'title': 'Jhelli Beam'
-        }, {
-            'title': 'Beaus$Eros'
-        }];
-
-        $compile(element)(scope);
-        scope.$digest();
-    }));
-
-    it("should have the correct amount of albums in the list", function() {
-        var list = element.find('li');
-        expect(list.length).toBe(7);
-    });
-});
-```
-
-
-
-(Our list is sourced from the crazy talented [Busdriver](http://en.wikipedia.org/wiki/Busdriver#Discography)!)
-
-Let’s fix the first error we see:
-
-`Error: No module: views/templates/albums.html`
-
-<!-- @section -->
-
-### Build a simple template
-
-```sh
-mkdir -p app/views/templates
-touch app/views/templates/albums.html
+So let's go and add a table definition for this data to our schema:
 
 ```
-
-Our test is still failing, let’s add the new template to the [albums.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/app/scripts/directives/albums.js#L6) directive, change the line of code declaring the template to:
-
-`templateUrl: 'views/templates/albums.html',`
-
-The test will still fail as we are not creating a list within the template. Let’s do that now by adding the following to the [albums.html](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/app/views/templates/albums.html):
-
-`<ul><li></li></ul>`
-
-And update the [albums.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/app/scripts/directives/albums.js) directive as follows:
-
-
-```javascript
-'use strict';
-
-angular.module('directiveExampleApp')
-  .directive('albums', function() {
-    return {
-        templateUrl: 'views/templates/albums.html',
-        restrict: 'E',
-        scope: {}
-    };
-});
+CREATE TABLE states (
+   abbreviation VARCHAR(20),
+   state_num TINYINT,
+   name VARCHAR(20),
+   PRIMARY KEY (state_num)
+);
 ```
 
+This sort of lookup table is very common in relational databases. They reduce redundancy and ensure data consistency. Two of the most common attributes of lookup tables are that they are relatively small in size and they are static. That is, they are primarily read-only.
 
-Word! The test passes. Let’s add another test to check the first album in the list has the correct title.
+It would be possible to partition the States table on the State_num column, like we do the Towns and People tables. However, when a table is relatively small and not updated frequently, it is better to replicate it to all partitions. This way, even if another table is partitioned (such as a customer table partitioned on last name), stored procedures can join the two tables, no matter what partition the procedure executes in.
 
-```javascript
-it("should display the correct album title for the first item in the albums list", function() {
-    var list = element.find('li');
-    expect(list.eq(0).text()).toBe('Memoirs of the Elephant Man');
-});
-```
+Tables where all the records appear in all the partitions are called replicated tables. Note that tables are replicated by default. So to make the States table a replicated table, we simply include the CREATE TABLE statement without an accompanying PARTITION TABLE statement.
 
-The test fails. Let’s add the title attribute to the directives scope in [albums.js](https://github.com/newtriks/angularjs-directives-testing-project/blob/master/app/scripts/directives/albums.js):
+One last caveat concerning replicated tables: the benefits of having the data replicated in all partitions is that it can be read from any individual partition. However, the deficit is that any updates or inserts to a replicated table must be executed in all partitions at once. This sort of multi-partition procedure reduces the benefits of parallel processing and impacts throughput. Which is why you should not replicate tables that are frequently updated.
 
-
-
-```javascript
-'use strict';
-
-angular.module('directiveExampleApp')
-  .directive('albums', function() {
-    return {
-        templateUrl: 'views/templates/albums.html',
-        restrict: 'E',
-        scope: {
-            title: '@title'
-        }
-    };
-});
-```
-
-
-Sweet, the test’s are passing again.
-
-All the source to this project can be found on [Github](https://github.com/newtriks/angularjs-directives-testing-project).
-
-
-<!-- @section -->
-
-### Potential errors and solutions
-
-**[Spawn error solution](https://github.com/karma-runner/karma/issues/452)**
-
-Set an env variable to your _~/.profile_ or _~/.bash_profile_.
-
-```sh
-which phantomjs
-export PHANTOMJS_BIN='YOUR_PATH_TO_PHANTOMJS'
-~/.profile to reload
-```
-
-**[Missing mocks error solution](https://github.com/yeoman/generator-angular#testing)**
-
-`bower install angular-mocks`
-
-<!-- @section -->
-
-### Useful links
-
-*   Vojta’s (godfather of Angular TDD) [ng-directive-testing](https://github.com/vojtajina/ng-directive-testing) example.
-*   Vojta’s [presentation](http://www.youtube.com/watch?v=rB5b67Cg6bc) on testing directives.
-*   AngularJS Developers [guide](http://docs.angularjs.org/guide/index)
+This ends Part Three of the tutorial.
