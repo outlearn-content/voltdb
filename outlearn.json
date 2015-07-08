@@ -10,13 +10,15 @@
       "privacy" : "public",
       "pages" : [
         {"page" : "./pages/preface.md"},
-        {"module" : "creating"}
+        {"module" : "creating"},
+        {"module" : "loading"}
       ]
     }
   ],
 
   "modules" : [
-    {"olm" : "./modules/creating.md"}
+    {"olm" : "./modules/creating.md"},
+    {"olm" : "./modules/loading.md"}
   ],
 
   "assets" : [
