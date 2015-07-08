@@ -11,14 +11,23 @@
       "pages" : [
         {"page" : "./pages/preface.md"},
         {"module" : "creating"},
-        {"module" : "loading"}
+        {"module" : "loading"},
+        {"module" : "partitioning"},
+        {"module" : "schema-updates"},
+        {"module" : "stored-procedures"},
+        {"module" : "client-applications"},
+        {"page" : "./pages/next-steps.md"}
       ]
     }
   ],
 
   "modules" : [
     {"olm" : "./modules/creating.md"},
-    {"olm" : "./modules/loading.md"}
+    {"olm" : "./modules/loading.md"},
+    {"olm" : "./modules/partitioning.md"},
+    {"olm" : "./modules/schema-updates.md"},
+    {"olm" : "./modules/stored-procedures.md"},
+    {"olm" : "./modules/client-applications.md"},
   ],
 
   "assets" : [
