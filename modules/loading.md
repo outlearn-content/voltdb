@@ -51,6 +51,8 @@ To save time and space, the resulting file containing only the data we need is i
 
 <!-- @task, "text" : "Save the data into data/towns.txt using the script provided."-->
 
+<!-- @section -->
+
 ## Restarting the Database
 
 Because we changed the schema and reordered the columns of the Towns table, we want to start over with an empty database and reload the schema. Alternately, if the database is still running you could do a DROP TABLE and CREATE TABLE to delete any existing data and replace the table definition.
@@ -69,6 +71,8 @@ Command succeeded.
 ```
 
 <!-- @task, "text" : "Restart the database."-->
+
+<!-- @section -->
 
 ## Loading the Data
 
@@ -90,6 +94,8 @@ In the preceding commands:
 The csvloader loads all of the records into the database and it generates three log files: one listing any errors that occurred, one listing any records it could not load from the data file, and a summary report including statistics on how long the loading process took and how many records were loaded.
 
 <!-- @task, "text" : "Insert the new data."-->
+
+<!-- @section -->
 
 ## Querying the Database
 
