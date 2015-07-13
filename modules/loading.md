@@ -18,9 +18,7 @@ As useful as ad hoc queries are, typing in data by hand is not very efficient. F
 
 When you define tables using the CREATE TABLE statement, VoltDB automatically creates stored procedures to insert records for each table. There is also a command line tool that uses these default stored procedures so you can load data files into your database with a single command. The **csvloader** command reads a data file, such as a comma-separated value (CSV) file, and writes each entry as a record in the specified database table using the default insert procedure.
 
-It just so happens that there is data readily available for towns and other landmarks in the United States. The Geographic Names Information Service (GNIS), part of the U.S. Geological Survey, provides data files of officially named locations throughout the United States. In particular, we are interested in the data file for populated places. This data is available as a text file from their web site, http://geonames.usgs.gov/domestic/download_data.htm.
-
-<!-- @link, "url" : "http://geonames.usgs.gov/domestic/download_data.htm", "text": "Download data from GNIS" -->
+It just so happens that there is data readily available for towns and other landmarks in the United States. The Geographic Names Information Service (GNIS), part of the U.S. Geological Survey, provides data files of officially named locations throughout the United States. In particular, we are interested in the data file for populated places. [This data is available as a text file from their web site](http://geonames.usgs.gov/domestic/download_data.htm).
 
 The information provided by GNIS not only includes the name, county and state, it includes each location's position (latitude and longitude) and elevation. Since we don't need all of the information provided, we can reduce the number of columns to only the information we want.
 
